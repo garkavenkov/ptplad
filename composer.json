@@ -1,0 +1,20 @@
+{
+    "name": "garkavenkov/ptplad",
+    "description": "Prepares PTPLad data for import into Opencart database",
+    "keywords": ["PTPLad"],
+    "type": "library",
+    "require": {
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Maksim Garkavenkov",
+            "email": "maksim.garkavenkov@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Garkavenkov\\PTPLad\\": "src"
+        }
+    }
+}
