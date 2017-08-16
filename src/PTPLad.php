@@ -285,6 +285,11 @@ class PTPLad
         return true;
     }
 
+    /**
+     * Imports Measure type
+     * @param  boolean $log Output information
+     * @return boolean      Work result
+     */
     public static function importMeasureType($log = false)
     {
         // Destination folder not found
@@ -294,7 +299,7 @@ class PTPLad
         }
 
         // Makes path to the file
-        $dir = rtrim($this->dest, '/') .'/webdata/000000001/import___*';
+        $dir = rtrim(self::$dest, '/') .'/webdata/000000001/import___*';
         // Grab first file from an array
         $file = glob($dir)[0];
         if (!$file) {
@@ -375,4 +380,140 @@ class PTPLad
         }
         return true;
     }
+
+    /**
+     * Imports Properties
+     * @param  boolean $log Output information
+     * @return boolean      Work result
+     */
+    public static function importProperties($log = false)
+    {
+        // Parent folder with properties' file
+        $main_directory = rtrim(self::$dest, '/') . "/webdata/000000001/properties/";
+
+        // Folders that contain files with properties
+        $dirs  = array_diff(scandir($main_directory), array('..', '.'));
+        asort($dirs);
+
+        $property_count = 0;
+        $arrayProperties = [];
+        $arrayPropertiesValues = [];
+
+        // Create table `ptplad_property`
+        $sql  = "DROP TABLE IF EXISTS `ptplad_property`; ";
+        $sql .= "CREATE TABLE `ptplad_property` (";
+        $sql .=     "`id` varchar(36) NOT NULL,";
+        $sql .=     "`name` varchar(255) NOT NULL,";
+        $sql .=     "PRIMARY KEY (`id`)";
+        $sql .= ") ENGINE=MyISAM DEFAULT CHARSET=utf8;";
+        if (!self::$dbh->query($sql)) {
+            echo "Cannot create table `ptplad_property`... Exit." . PHP_EOL;
+            exit;
+        }
+
+        // Create table `ptplad_property_value`
+        $sql  = "DROP TABLE IF EXISTS `ptplad_property_value`; ";
+        $sql .= "CREATE TABLE `ptplad_property_value` (";
+        $sql .=     "`property_id` varchar(36) NOT NULL,";
+        $sql .=     "`property_value_id` varchar(36) NOT NULL,";
+        $sql .=     "`value` varchar(100) NOT NULL,";
+        $sql .=     "PRIMARY KEY (`property_id`,`property_value_id`)";
+        $sql .= ") ENGINE=MyISAM DEFAULT CHARSET=utf8;";
+        if (!self::$dbh->query($sql)) {
+            echo "Cannot create table `ptplad_property_value`... Exit." . PHP_EOL;
+            exit;
+        }
+
+        // Prepared SQL statement for table `ptplad_property_value`
+        $sql  = "INSERT INTO `ptplad_property` (";
+        $sql .=     "`id`,";
+        $sql .=     "`name`";
+        $sql .= ") VALUES (";
+        $sql .=     ":property_id ,";
+        $sql .=     ":property_name";
+        $sql .= ")";
+        $property_stmt = self::$dbh->prepare($sql);
+        if (!$property_stmt) {
+            echo "Cannot create table `ptplad_property`... Exit." . PHP_EOL;
+            exit();
+        }
+
+        // Prepared SQL statement for table `ptplad_property_value`
+        $sql  = "INSERT INTO `ptplad_property_value` (";
+        $sql .=     "`property_id`, ";
+        $sql .=     "`property_value_id`, ";
+        $sql .=     "`value`) ";
+        $sql .= "VALUES (";
+        $sql .=     ":property_id, ";
+        $sql .=     ":property_value_id, ";
+        $sql .=     ":property_value";
+        $sql .= ")";
+        $value_stmt = self::$dbh->prepare($sql);
+        if (!$value_stmt) {
+            echo "Cannot create table `ptplad_property_value`... Exit." . PHP_EOL;
+            exit();
+        }
+
+        foreach ($dirs as $key => $dir) {
+            // Files with properties in folder for array with folders
+            $files = array_diff(scandir($main_directory.$dir), array('..', '.'));
+
+            foreach ($files as $key => $file) {
+                $filename = $main_directory . $dir . "/" . $file;
+                echo "---=== Обрабатывается файл '$filename' ===---" . PHP_EOL;
+
+                // Load XML from a file
+                $doc = \DOMDocument::load($filename);
+                // Create DOMXPath object
+                $xpath = new \DOMXPath($doc);
+
+                // Register prefix
+                $prefix = "ptplat";
+                $rootNamespace = $doc->lookupNamespaceUri($doc->namespaceURI);
+                if (!($xpath->registerNamespace($prefix, $rootNamespace))) {
+                    echo "Cannot register namespace {$uri}.";
+                };
+
+                // XPath query
+                $xquery  = "/{$prefix}:КоммерческаяИнформация";
+                $xquery .= "/{$prefix}:Классификатор";
+                $xquery .= "/{$prefix}:Свойства";
+                $xquery .= "/{$prefix}:Свойство";
+
+                $properties = $xpath->query($xquery);
+
+                foreach ($properties as $property) {
+                    $property_id = $property->getElementsByTagName('Ид')[0]->textContent;
+                    $property_name = $property->getElementsByTagName('Наименование')[0]->textContent;
+
+                    $property_stmt->execute(array(
+                        ":property_id" => $property_id,
+                        ":property_name" => $property_name
+                    ));
+
+                    $property_values = $property->getElementsByTagName('Справочник');
+                    if ($property_values->length > 0) {
+                        foreach ($property_values as $value) {
+                            $property_value_id = $value->getElementsByTagName('ИдЗначения')[0]->textContent;
+                            $property_value = $value->getElementsByTagName('Значение')[0]->textContent;
+
+                            $value_stmt->execute(array(
+                                ":property_id"          => $property_id,
+                                ":property_value_id"    => $property_value_id,
+                                ":property_value"       => $property_value
+                            ));
+                        }
+                    }
+                    // echo    "\tДля свойства '$property_name' добавлено " . $property_values->length . " значений" . PHP_EOL;
+
+                    $property_count++;
+                }
+            }
+        }
+        if ($log) {
+            echo "Обработано $property_count свойств для товаров." . PHP_EOL;
+        }
+        return true;
+    }
+
 }
