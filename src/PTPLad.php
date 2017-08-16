@@ -11,9 +11,7 @@ class PTPLad
     private static $dump_dest;
 
     /**
-     * Extracts archive
-     *
-     * Extracts archive from $source  into $dest folder
+     * Extracts archive from '$source' file  into '$dest' folder
      *
      * @param  string  $source Path to archive file
      * @param  string  $dest   Path to the folder for extraction
@@ -56,4 +54,235 @@ class PTPLad
             exit();
         }
     }
+
+    /**
+     * Import categories from PTPLad database dump file
+     * into table 'ptplad_category'
+     *
+     * @param  boolean $log Output information
+     * @return boolean      Work result
+     */
+    public static function importCategories($log = false)
+    {
+        // Destination folder not found
+        if (!self::$dest) {
+            echo "Cannot find folder with exracted files." . PHP_EOL;
+            exit;
+        }
+
+        // Make path to the file
+        $dir = rtrim($this->dest, '/') .'/webdata/000000001/import___*';
+        // Grab first file from an array
+        $file = glob($dir)[0];
+        if (!$file) {
+            echo "Cannot find file with categories in destination folder." . PHP_EOL;
+            exit;
+        }
+
+        // Load XML from a file
+        $dom = \DOMDocument::load($file);
+        // Create DOMXPath object
+        $xpath = new \DOMXPath($dom);
+
+        // Register prefix
+        $prefix = "ptplad";
+        $rootNamespace = $dom->lookupNamespaceUri($dom->namespaceURI);
+        if (!($xpath->registerNamespace($prefix, $rootNamespace))) {
+            echo "Cannot register namespace {$uri}.";
+        };
+
+        // Category depth
+        $depth=0;
+
+        $catalog = [];
+
+        // XPath query
+        $main_xquery  = "/${prefix}:КоммерческаяИнформация";
+        $main_xquery .= "/${prefix}:Классификатор";
+        $main_xquery .= "/${prefix}:Группы";
+        $main_xquery .= "/${prefix}:Группа";
+
+        // Main category
+        $group = $xpath->query($main_xquery);
+        $id = $group->item(0)->getElementsByTagName('Ид')[0]->textContent;
+        $name =  $group->item(0)->getElementsByTagName('Наименование')[0]->textContent;
+
+        // Categories array
+        $catalog[] = array(
+            'parent_id' => 0,
+            'id'        => $id,
+            'name'      => $name,
+            'depth'     => $depth
+        );
+
+        // Search subcategories
+        $xquery_part = "/${prefix}:Группы/${prefix}:Группа";
+        $i=1;
+        $cycle = true;
+        while ($cycle) {
+            $xquery = '';
+            // Categories
+            $xquery = $main_xquery . str_repeat($xquery_part, $i);
+
+            $groups = $xpath->query($xquery);
+
+            if ($groups->length > 0) {
+                $depth++;
+            } else {
+                $cycle = false;
+            }
+            foreach ($groups as $group) {
+                $id = $group->getElementsByTagName('Ид')[0]->textContent;
+                $name =  $group->getElementsByTagName('Наименование')[0]->textContent;
+                $parent_id = $group->parentNode->parentNode->getElementsByTagName('Ид')[0]->textContent . PHP_EOL;
+                $catalog[] = array(
+                    'parent_id' => $parent_id,
+                    'id'  => $id,
+                    'name' => $name,
+                    'depth' => $depth
+                );
+            }
+            $i++;
+        }
+
+        // Create table `ptplad_category`
+        $sql  = "DROP TABLE IF EXISTS `ptplad_category`; ";
+        $sql .= "CREATE TABLE `ptplad_category` (";
+        $sql .=     "`id` varchar(36) NOT NULL,";
+        $sql .=     "`parent_id` varchar(36) NOT NULL,";
+        $sql .=     "`name` varchar(255) NOT NULL,";
+        $sql .=     "`depth` tinyint(4) NOT NULL,";
+        $sql .=     "PRIMARY KEY (`id`)";
+        $sql .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8;";
+        if (!self::$dbh->query($sql)) {
+            echo "Cannot create table `ptplad_category`... Exit." . PHP_EOL;
+            exit();
+        }
+
+        // Prepared SQL statement for `ptplad_category`
+        $sql  = "INSERT INTO `ptplad_category` (";
+        $sql .=     "`id`, ";
+        $sql .=     "`parent_id`, ";
+        $sql .=     "`name`, ";
+        $sql .=     "`depth`";
+        $sql .= ") VALUES (";
+        $sql .=     ":id, ";
+        $sql .=     ":parent_id, ";
+        $sql .=     ":name, ";
+        $sql .=     ":depth";
+        $sql .= ")";
+        $stmt = self::$dbh->prepare($sql);
+        if (!$stmt) {
+            echo "Cannot create prepares SQL statement for table 'ptplad_category'. Exit..." . PHP_EOL;
+            exit();
+        }
+
+        // Insert categories into the table `ptplad_category`
+        $categories = 0;
+        foreach ($catalog as $entry) {
+            $stmt->execute(array(
+                ":id" => $entry['id'],
+                ":parent_id" => $entry['parent_id'],
+                ":name" => $entry['name'],
+                ":depth" => $entry['depth']
+            ));
+            $categories++;
+        }
+        if ($log) {
+            echo "Импортировано $categories категорий...." . PHP_EOL;
+        }
+        return true;
+    }
+
+    /**
+     * Imports Price type
+     * @param  boolean $log Output information
+     * @return boolean      Work result
+     */
+    public static function importPriceType($log = false)
+    {
+        // Destination folder not found
+        if (!self::$dest) {
+            echo "Cannot find folder with exracted files." . PHP_EOL;
+            exit;
+        }
+
+        // Make path to the file
+        $dir = rtrim(self::$dest, '/') .'/webdata/000000001/import___*';
+        // Grab first file from an array
+        $file = glob($dir)[0];
+        if (!$file) {
+            echo "Cannot find file with categories in destination folder." . PHP_EOL;
+            exit;
+        }
+
+        $start = microtime(true);
+
+        // Load XML from a file
+        $dom = \DOMDocument::load($file);
+        // Create DOMXPath object
+        $xpath = new \DOMXPath($dom);
+
+        // Register prefix
+        $prefix = "ptplad";
+        $rootNamespace = $dom->lookupNamespaceUri($dom->namespaceURI);
+        if (!($xpath->registerNamespace($prefix, $rootNamespace))) {
+            echo "Cannot register namespace {$uri}.";
+        };
+
+        // XPath query
+        $xquery  = "/{$prefix}:КоммерческаяИнформация";
+        $xquery .= "/{$prefix}:Классификатор";
+        $xquery .= "/{$prefix}:ТипыЦен";
+        $xquery .= "/{$prefix}:ТипЦены";
+
+        $price_types = $xpath->query($xquery);
+
+        // Crate table `ptplad_price_type`
+        $sql  = "DROP TABLE IF EXISTS `ptplad_price_type`; ";
+        $sql .= "CREATE TABLE `ptplad_price_type` (";
+        $sql .=     "`id` varchar(36) NOT NULL,";
+        $sql .=     "`name` varchar(255) NOT NULL,";
+        $sql .=     "PRIMARY KEY (`id`)";
+        $sql .= ") ENGINE=MyISAM DEFAULT CHARSET=utf8;";
+        if (!self::$dbh->query($sql)) {
+            echo "Cannot create table `ptplad_price_type`... Exit." . PHP_EOL;
+            exit;
+        }
+
+        // Prepared SQL statement for table `ptplad_price_type`
+        $sql  = "INSERT INTO `ptplad_price_type` (";
+        $sql .=     "`id`, ";
+        $sql .=     "`name`";
+        $sql .= ") VALUES (";
+        $sql .=     ":price_type_id,";
+        $sql .=     ":price_type_name";
+        $sql .= ")";
+        $stmt = self::$dbh->prepare($sql);
+        if (!$stmt) {
+            echo "Cannot create table `ptplad_price_type`... Exit." . PHP_EOL;
+            exit();
+        }
+
+        $price_type_count = 0;
+        if ($price_types->length > 0) {
+            foreach ($price_types as $type) {
+                $price_type_id = $type->getElementsByTagName('Ид')[0]->textContent;
+                $price_type_name = $type->getElementsByTagName('Наименование')[0]->textContent;
+
+                $stmt->execute(array(
+                    ":price_type_id" => $price_type_id,
+                    ":price_type_name" => $price_type_name
+                ));
+                $price_type_count++;
+            }
+        }
+        $end = microtime(true);
+        $parse_time = $end-$start;
+        if ($log) {
+            echo "Обработано $price_type_count типов цен за $parse_time." . PHP_EOL;
+        }
+        return true;
+    }
+    
 }
