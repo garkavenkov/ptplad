@@ -244,7 +244,7 @@ class PTPLad
         $sql .=     "`id` varchar(36) NOT NULL,";
         $sql .=     "`name` varchar(255) NOT NULL,";
         $sql .=     "PRIMARY KEY (`id`)";
-        $sql .= ") ENGINE=MyISAM DEFAULT CHARSET=utf8;";
+        $sql .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         if (!self::$dbh->query($sql)) {
             echo "Cannot create table `ptplad_price_type`... Exit." . PHP_EOL;
             exit;
@@ -336,7 +336,7 @@ class PTPLad
         $sql .=   "`short_name` varchar(45) NOT NULL,";
         $sql .=   "`full_name` varchar(100) DEFAULT NULL,";
         $sql .=   "PRIMARY KEY (`id`)";
-        $sql .= ") ENGINE=MyISAM DEFAULT CHARSET=utf8;";
+        $sql .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         if (!self::$dbh->query($sql)) {
             echo "Cannot create table `ptplad_measure_type`... Exit." . PHP_EOL;
             exit;
@@ -405,7 +405,7 @@ class PTPLad
         $sql .=     "`id` varchar(36) NOT NULL,";
         $sql .=     "`name` varchar(255) NOT NULL,";
         $sql .=     "PRIMARY KEY (`id`)";
-        $sql .= ") ENGINE=MyISAM DEFAULT CHARSET=utf8;";
+        $sql .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         if (!self::$dbh->query($sql)) {
             echo "Cannot create table `ptplad_property`... Exit." . PHP_EOL;
             exit;
@@ -418,7 +418,7 @@ class PTPLad
         $sql .=     "`property_value_id` varchar(36) NOT NULL,";
         $sql .=     "`value` varchar(100) NOT NULL,";
         $sql .=     "PRIMARY KEY (`property_id`,`property_value_id`)";
-        $sql .= ") ENGINE=MyISAM DEFAULT CHARSET=utf8;";
+        $sql .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         if (!self::$dbh->query($sql)) {
             echo "Cannot create table `ptplad_property_value`... Exit." . PHP_EOL;
             exit;
@@ -516,4 +516,97 @@ class PTPLad
         return true;
     }
 
+    /**
+     * Imports Offers
+     * @param  boolean $log Output information
+     * @return boolean      Work result
+     */
+    public static function importOffers($log = false)
+    {
+        $start = microtime(true);
+        // Parent folder with offers' file
+        $main_directory = rtrim(self::$dest, '/') . "/webdata/000000001/goods/";
+
+        // Folders that contain files with offers
+        $dirs  = array_diff(scandir($main_directory), array('..', '.'));
+        asort($dirs);
+
+        $product_count = 0;
+
+        // Create table `ptplad_offer`
+        $sql  = "DROP TABLE IF EXISTS `ptplad_offer`; ";
+        $sql .= "CREATE TABLE `ptplad_offer` (";
+        $sql .=   "`product_id` varchar(36) NOT NULL,";
+        $sql .=   "`name` varchar(255) NOT NULL,";
+        $sql .=   "PRIMARY KEY (`product_id`)";
+        $sql .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8;";
+        if (!self::$dbh->query($sql)) {
+            echo "Cannot create table `ptplad_offer`... Exit." . PHP_EOL;
+            exit;
+        }
+
+        // Prepared SQL statement for table `ptplad_offer`
+        $sql  = "INSERT INTO `ptplad_offer` (";
+        $sql .=     "`product_id`,";
+        $sql .=     "`name`";
+        $sql .= ") VALUES (";
+        $sql .=     ":product_id,";
+        $sql .=     ":product_name";
+        $sql .= ")";
+        $offer_stmt = self::$dbh->prepare($sql);
+        if (!$offer_stmt) {
+            echo "Cannot create table `ptplad_offer`... Exit." . PHP_EOL;
+            exit();
+        }
+
+        foreach ($dirs as $key => $dir) {
+            chdir($main_directory . $dir);
+
+            $dh = opendir($main_directory . $dir);
+
+            if ($dh = opendir($main_directory . $dir)) {
+                $files = glob('offers___*');
+            };
+
+            foreach ($files as $key => $file) {
+                $filename =  $main_directory . $dir . "/" . $file;
+                // echo "---=== Обрабатывается файл '$filename' ===---" . PHP_EOL;
+
+                $doc = \DOMDocument::load($filename);
+                $xpath = new \DOMXPath($doc);
+
+                $prefix = "ptplad";
+                $rootNamespace = $doc->lookupNamespaceUri($doc->namespaceURI);
+
+                if (!($xpath->registerNamespace($prefix, $rootNamespace))) {
+                    echo "Cannot register namespace {$uri}.";
+                };
+
+                $xquery  = "/{$prefix}:КоммерческаяИнформация";
+                $xquery .= "/{$prefix}:ПакетПредложений";
+                $xquery .= "/{$prefix}:Предложения";
+                $xquery .= "/{$prefix}:Предложение";
+
+                $products = $xpath->query($xquery);
+                if ($products->length > 0) {
+                    foreach ($products as $product) {
+                        $product_id = $product->getElementsByTagName('Ид')[0]->textContent;
+                        $product_name = $product->getElementsByTagName('Наименование')[0]->textContent;
+
+                        $offer_stmt->execute(array(
+                            ":product_id"   => $product_id,
+                            ":product_name" => $product_name
+                        ));
+
+                        $product_count++;
+                    }
+                }
+                echo "\tОбработано " . $products->length . " предложений" . PHP_EOL;
+            }
+        }
+        $end = microtime(true);
+        $parse_time = $end-$start;
+
+        echo "Обработано $product_count товаров за {$parse_time}." . PHP_EOL;
+    }
 }
