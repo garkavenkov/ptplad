@@ -284,5 +284,95 @@ class PTPLad
         }
         return true;
     }
-    
+
+    public static function importMeasureType($log = false)
+    {
+        // Destination folder not found
+        if (!self::$dest) {
+            echo "Cannot find folder with exracted files." . PHP_EOL;
+            exit;
+        }
+
+        // Makes path to the file
+        $dir = rtrim($this->dest, '/') .'/webdata/000000001/import___*';
+        // Grab first file from an array
+        $file = glob($dir)[0];
+        if (!$file) {
+            echo "Cannot find file with categories in destination folder." . PHP_EOL;
+            exit;
+        }
+
+        $start = microtime(true);
+
+        // Load XML from a file
+        $dom = \DOMDocument::load($file);
+        // Create DOMXPath object
+        $xpath = new \DOMXPath($dom);
+
+        // Register prefix
+        $prefix = "ptplad";
+        $rootNamespace = $dom->lookupNamespaceUri($dom->namespaceURI);
+        if (!($xpath->registerNamespace($prefix, $rootNamespace))) {
+            echo "Cannot register namespace {$uri}.";
+        };
+
+        // XPathe query
+        $xquery  = "/{$prefix}:КоммерческаяИнформация";
+        $xquery .= "/{$prefix}:Классификатор";
+        $xquery .= "/{$prefix}:ЕдиницыИзмерения";
+        $xquery .= "/{$prefix}:ЕдиницаИзмерения";
+
+        $measure_types = $xpath->query($xquery);
+
+        // Create table `ptplad_measure_type`
+        $sql  = "DROP TABLE IF EXISTS `ptplad_measure_type`; ";
+        $sql .= "CREATE TABLE `ptplad_measure_type` (";
+        $sql .=   "`id` varchar(36) NOT NULL,";
+        $sql .=   "`short_name` varchar(45) NOT NULL,";
+        $sql .=   "`full_name` varchar(100) DEFAULT NULL,";
+        $sql .=   "PRIMARY KEY (`id`)";
+        $sql .= ") ENGINE=MyISAM DEFAULT CHARSET=utf8;";
+        if (!self::$dbh->query($sql)) {
+            echo "Cannot create table `ptplad_measure_type`... Exit." . PHP_EOL;
+            exit;
+        }
+
+        // Prepared SQL statement for table `ptplad_measure_type`
+        $sql  = "INSERT INTO `ptplad_measure_type` (";
+        $sql .=     "`id`,";
+        $sql .=     "`short_name`,";
+        $sql .=     "`full_name` ";
+        $sql .= ") VALUES (";
+        $sql .=     ":id,";
+        $sql .=     ":short_name, ";
+        $sql .=     ":full_name ";
+        $sql .= ")";
+        $stmt = self::$dbh->prepare($sql);
+        if (!$stmt) {
+            echo "Cannot create table `ptplad_measure_type`... Exit." . PHP_EOL;
+            exit();
+        }
+
+        if ($measure_types->length > 0) {
+            $measure_type_count = 0;
+            foreach ($measure_types as $type) {
+                $measure_type_id = $type->getElementsByTagName('Ид')[0]->textContent;
+                $measure_type_short_name = $type->getElementsByTagName('НаименованиеКраткое')[0]->textContent;
+                $measure_type_full_name = $type->getElementsByTagName('НаименованиеПолное')[0]->textContent;
+
+                $stmt->execute(array(
+                    ":id" => $measure_type_id,
+                    ":short_name" => $measure_type_short_name,
+                    ":full_name" => $measure_type_full_name
+                ));
+                $measure_type_count++;
+            }
+        }
+        $end = microtime(true);
+        $parse_time = $end-$start;
+        if ($log) {
+            echo "Обработано $measure_type_count типов едениц измерения за $parse_time." . PHP_EOL;
+        }
+        return true;
+    }
 }
