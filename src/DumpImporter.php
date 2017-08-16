@@ -2,7 +2,7 @@
 
 namespace Garkavenkov\PTPLad;
 
-class PTPLad
+class DumpImporter
 {
     /**
      * Path to the folder for extraction dump
@@ -716,5 +716,251 @@ class PTPLad
        }
        return true;
     }
-    
+
+    /**
+     * Imports Products
+     * @param  boolean $log  Output work result
+     * @return boolean       True if records have been inserted, false otherwise
+    */
+    public static function importProducts($log = false)
+    {
+        $start = microtime(true);
+
+        echo "----==== Запущен процесс обработки фалов с товарами ====----" . PHP_EOL;
+        // Parent folder with Products' file
+        $main_directory = rtrim(self::$dest, '/') . "/webdata/000000001/goods/";
+        // Folders that contain files with products
+        $dirs  = array_diff(scandir($main_directory), array('..', '.'));
+        asort($dirs);
+
+        $product_count = 0;
+
+        // ********************* Create tables ********************************
+        // Table `ptplad_product`
+        $sql  = "DROP TABLE IF EXISTS `ptplad_product`; ";
+        $sql .= "CREATE TABLE `ptplad_product` (";
+        $sql .=     "`id` varchar(36) NOT NULL,";
+        $sql .=     "`article` varchar(255) NOT NULL,";
+        $sql .=     "`name` varchar(255) NOT NULL,";
+        $sql .=     "`measure_type_id` varchar(36) NOT NULL,";
+        $sql .=     "`description` text,";
+        $sql .=     "PRIMARY KEY (`id`)";
+        $sql .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8;";
+        if (!self::$dbh->query($sql)) {
+            echo "Cannot create table `ptplad_product`... Exit." . PHP_EOL;
+            exit;
+        }
+
+        // Table `ptplad_product_image`
+        $sql  = "DROP TABLE IF EXISTS `ptplad_product_image`; ";
+        $sql .= "CREATE TABLE `ptplad_product_image` (";
+        $sql .=     "`product_id` varchar(36) NOT NULL,";
+        $sql .=     "`path` varchar(255) NOT NULL";
+        $sql .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8;";
+        if (!self::$dbh->query($sql)) {
+            echo "Cannot create table `ptplad_product_image`... Exit." . PHP_EOL;
+            exit;
+        }
+
+        // Table `ptplad_product_category`
+        $sql  = "DROP TABLE IF EXISTS `ptplad_product_category`; ";
+        $sql .= "CREATE TABLE `ptplad_product_category` (";
+        $sql .=     "`product_id` varchar(36) NOT NULL,";
+        $sql .=     "`category_id` varchar(36) NOT NULL,";
+        $sql .=     "PRIMARY KEY (`product_id`)";
+        $sql .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8;";
+        if (!self::$dbh->query($sql)) {
+            echo "Cannot create table `ptplad_product_category`... Exit." . PHP_EOL;
+            exit;
+        }
+
+        // Table `ptplad_product_property`
+        $sql  = "DROP TABLE IF EXISTS `ptplad_product_property`; ";
+        $sql .= "CREATE TABLE `ptplad_product_property` (";
+        $sql .=     "`product_id` varchar(36) NOT NULL,";
+        $sql .=     "`property_id` varchar(36) NOT NULL,";
+        $sql .=     "`property_value_id` varchar(45) NOT NULL";
+        $sql .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8;";
+        if (!self::$dbh->query($sql)) {
+            echo "Cannot create table `ptplad_product_property`... Exit." . PHP_EOL;
+            exit;
+        }
+        // ********************************************************************
+
+        // ****************** Prepared statements *****************************
+        // Table `ptplad_product`
+        $sql  = "INSERT INTO `ptplad_product` (";
+        $sql .=     "`id`, ";
+        $sql .=     "`article`, ";
+        $sql .=     "`name`, ";
+        $sql .=     "`measure_type_id`, ";
+        $sql .=     "`description`";
+        $sql .= ") VALUES (";
+        $sql .=     ":product_id, ";
+        $sql .=     ":product_article, ";
+        $sql .=     ":product_name, ";
+        $sql .=     ":product_measure_id, ";
+        $sql .=     ":product_description";
+        $sql .= ")";
+        $product_stmt = self::$dbh->prepare($sql);
+        if (!$product_stmt) {
+            echo "Cannot create prepared statement for table `ptplad_product`. Exit..." . PHP_EOL;
+            exit;
+        }
+
+        // Table `ptplad_product_image`
+        $sql  = "INSERT INTO `ptplad_product_image` (";
+        $sql .=     "`product_id`, ";
+        $sql .=     "`path`";
+        $sql .= ") VALUES (";
+        $sql .=     ":product_id, ";
+        $sql .=     ":path";
+        $sql .= ")";
+        $pictures_stmt = self::$dbh->prepare($sql);
+        if (!$pictures_stmt) {
+            echo "Cannot create prepared statement for table `ptplad_product_image`. Exit..." . PHP_EOL;
+            exit;
+        }
+
+        // Table `ptplad_product_category`
+        $sql  = "INSERT INTO `ptplad_product_category` (";
+        $sql .=     "`product_id`, ";
+        $sql .=     "`category_id`";
+        $sql .= ") VALUES (";
+        $sql .=     ":product_id, ";
+        $sql .=     ":category_id";
+        $sql .= ")";
+        $categories_stmt = self::$dbh->prepare($sql);
+        if (!$categories_stmt) {
+            echo "Cannot create prepared statement for table `ptplad_product_category`. Exit..." . PHP_EOL;
+            exit;
+        }
+
+        // Table `ptplad_product_property`
+        $sql  = "INSERT INTO `ptplad_product_property` (";
+        $sql .=     "`product_id`, ";
+        $sql .=     "`property_id`, ";
+        $sql .=     "`property_value_id` ";
+        $sql .= ") VALUES (";
+        $sql .=     ":product_id, ";
+        $sql .=     ":property_id, ";
+        $sql .=     ":property_value_id ";
+        $sql .= ")";
+        $properties_stmt = self::$dbh->prepare($sql);
+        if (!$properties_stmt) {
+            echo "Cannot create prepared statement for table `ptplad_product_property`. Exit..." . PHP_EOL;
+            exit;
+        }
+
+        // Loop throughout directories
+       foreach ($dirs as $key => $dir) {
+           chdir($main_directory . $dir);
+           // Array of files with products
+           if ($dh = opendir($main_directory . $dir)) {
+               $files = glob('import___*');
+           };
+
+           foreach ($files as $key => $file) {
+               $filename =  $main_directory . $dir . "/" . $file;
+               if ($log) {
+                   echo "---=== Обрабатывается файл '$filename' ===---" . PHP_EOL;
+               }
+
+               // Load XML from a file
+               $doc = \DOMDocument::load($filename);
+               // Create DOMXPath object
+               $xpath = new \DOMXPath($doc);
+
+               // Register prefix
+               $prefix = "ptplad";
+               $rootNamespace = $doc->lookupNamespaceUri($doc->namespaceURI);
+               if (!($xpath->registerNamespace($prefix, $rootNamespace))) {
+                   echo "Cannot register namespace {$uri}.";
+               };
+
+               // XPath  query
+               $xquery  = "/{$prefix}:КоммерческаяИнформация";
+               $xquery .= "/{$prefix}:Каталог";
+               $xquery .= "/{$prefix}:Товары";
+               $xquery .= "/{$prefix}:Товар";
+
+               $products = $xpath->query($xquery);
+               if ($products->length > 0) {
+                   foreach ($products as $product) {
+                       $product_id = $product->getElementsByTagName('Ид')[0]->textContent;
+                       $product_article = $product->getElementsByTagName('Артикул')[0]->textContent;
+                       $product_name = $product->getElementsByTagName('Наименование')[0]->textContent;
+                       $product_measure_id = $product->getElementsByTagName('БазоваяЕдиница')[0]->textContent;
+                       $product_description = $product->getElementsByTagName('Описание')[0]->textContent;
+
+                       // Insert product
+                       $product_stmt->execute(array(
+                           ":product_id"            => $product_id,
+                           ":product_article"       => $product_article,
+                           ":product_name"          => $product_name,
+                           ":product_measure_id"    => $product_measure_id,
+                           ":product_description"   => $product_description
+                       ));
+
+                       // Insert images
+                       $pictures = $product->getElementsByTagName('Картинка');
+                       if ($pictures->length > 0) {
+                           foreach ($pictures as $picture) {
+                               $picture_path = $main_directory .
+                                               $dir .
+                                               "/" .
+                                               $picture->textContent;
+                               if (file_exists($picture_path)) {
+                                   $pictures_stmt->execute(array(
+                                       ":product_id"    => $product_id,
+                                       ":path"          => $picture_path
+                                   ));
+                               }
+                           }
+                       }
+
+                       // Insert product categories
+                       $categories = $product->getElementsByTagName('Группы');
+                       if ($categories->length > 0) {
+                           foreach ($categories as $category) {
+                               $category_id = $category->getElementsByTagName('Ид')[0]->textContent;
+                               $categories_stmt->execute(array(
+                                   ":product_id"    => $product_id,
+                                   ":category_id"   => $category_id
+                               ));
+                           }
+                       }
+
+                       // Insert product characteristics
+                       $properties = $product->getElementsByTagName('ЗначенияСвойства');
+                       if ($properties->length > 0) {
+                           foreach ($properties as $property) {
+                               if ($property->getElementsByTagName('Значение')[0]->textContent) {
+                                   $property_id = $property->getElementsByTagName('Ид')[0]->textContent;
+                                   $property_value_id = $property->getElementsByTagName('Значение')[0]->textContent;
+
+                                   $properties_stmt->execute(array(
+                                       ":product_id"        =>  $product_id,
+                                       ":property_id"       => $property_id,
+                                       ":property_value_id" => $property_value_id
+                                   ));
+                               }
+                           }
+                       }
+                       $product_count++;
+                   }
+               }
+               if ($log) {
+                   echo "\tОбработано " . $products->length  . " товаров " .  PHP_EOL;
+               }
+
+           }
+       }
+       $end = microtime(true);
+       $parse_time = $end-$start;
+       if ($log) {
+           echo "Обработано $product_count товаров за $parse_time" . PHP_EOL;
+       }
+       return true;
+    }
 }
