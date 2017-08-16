@@ -609,4 +609,112 @@ class PTPLad
 
         echo "Обработано $product_count товаров за {$parse_time}." . PHP_EOL;
     }
+
+    /**
+     * Imports Prices
+     * @param  boolean $log  Output work result
+     * @return boolean       True if records have been inserted, false otherwise
+     */
+    public static function importPrices($log = false)
+    {
+        $start = microtime(true);
+        // Parent folder with prices' file
+        $main_directory = rtrim(self::$dest, '/') . "/webdata/000000001/goods/";
+        // Folders that contain files with prices
+        $dirs  = array_diff(scandir($main_directory), array('..', '.'));
+        asort($dirs);
+
+        $product_count = 0;
+        $price_count = 0;
+
+        // Create table `ptplad_product_price`
+        $sql  = "DROP TABLE IF EXISTS `ptplad_product_price`; ";
+        $sql .= "CREATE TABLE `ptplad_product_price` (";
+        $sql .=     "`product_id` varchar(36) NOT NULL,";
+        $sql .=     "`price_type_id` varchar(36) NOT NULL,";
+        $sql .=     "`value` decimal(10,2) NOT NULL DEFAULT '0.00',";
+        $sql .=     "PRIMARY KEY (`product_id`,`price_type_id`)";
+        $sql .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8;";
+        if (!self::$dbh->query($sql)) {
+            echo "Cannot create table `ptplad_product_price`... Exit." . PHP_EOL;
+            exit;
+        }
+
+        // Prepared SQL statement
+        $sql  = "INSERT INTO `ptplad_product_price` (";
+        $sql .=     "`product_id`, ";
+        $sql .=     "`price_type_id`, ";
+        $sql .=     "`value`";
+        $sql .= ") VALUES (";
+        $sql .=     ":product_id,";
+        $sql .=     ":price_type_id,";
+        $sql .=     ":price_for_product";
+        $sql .= ")";
+        $stmt = self::$dbh->prepare($sql);
+        if (!$stmt) {
+            echo "Cannot create prepared statement... Exit..." . PHP_EOL;
+            exit();
+        }
+
+        // XPath query
+        $xquery  = "/{$prefix}:КоммерческаяИнформация";
+        $xquery .= "/{$prefix}:ПакетПредложений";
+        $xquery .= "/{$prefix}:Предложения";
+        $xquery .= "/{$prefix}:Предложение";
+
+        foreach ($dirs as $key => $dir) {
+           chdir($main_directory . $dir);
+
+           if ($dh = opendir($main_directory . $dir)) {
+               $files = glob('prices___*');
+           };
+
+           foreach ($files as $key => $file) {
+               $filename =  $main_directory . $dir . "/" . $file;
+               // echo $file . PHP_EOL;
+
+               $doc = \DOMDocument::load($filename);
+               $xpath = new \DOMXPath($doc);
+
+               // Register prefix
+               $prefix = "ptplad";
+               $rootNamespace = $doc->lookupNamespaceUri($doc->namespaceURI);
+               if (!($xpath->registerNamespace($prefix, $rootNamespace))) {
+                   echo "Cannot register namespace {$uri}.";
+               };
+
+               $products = $xpath->query($xquery);
+               // echo "File: $file . Products: $products->length" . PHP_EOL;
+               if ($products->length > 0) {
+                   foreach ($products as $product) {
+                       $product_id = $product->getElementsByTagName('Ид')[0]->textContent;
+                       $prices = $product->getElementsByTagName('Цена');
+
+                       if ($prices->length > 0) {
+                           foreach ($prices as $price) {
+                               $price_type_id = $price->getElementsByTagName('ИдТипаЦены')[0]->textContent;
+                               $price_for_product = $price->getElementsByTagName('ЦенаЗаЕдиницу')[0]->nodeValue;
+                               $currency = $price->getElementsByTagName('Валюта')[0]->textContent;
+
+                               $stmt->execute(array(
+                                   ":product_id"        => $product_id,
+                                   ":price_type_id"     => $price_type_id,
+                                   ":price_for_product" => $price_for_product
+                               ));
+                               $price_count++;
+                           }
+                       }
+                       $product_count++;
+                   }
+               }
+           }
+       }
+       $end = microtime(true);
+       $parse_time = $end-$start;
+       if ($log) {
+           echo "Обработано $price_count записей с ценами для $product_count товаров за $parse_time." . PHP_EOL;
+       }
+       return true;
+    }
+    
 }
