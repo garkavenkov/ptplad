@@ -663,58 +663,58 @@ class DumpImporter
         $xquery .= "/{$prefix}:Предложение";
 
         foreach ($dirs as $key => $dir) {
-           chdir($main_directory . $dir);
+            chdir($main_directory . $dir);
 
-           if ($dh = opendir($main_directory . $dir)) {
-               $files = glob('prices___*');
-           };
+            if ($dh = opendir($main_directory . $dir)) {
+                $files = glob('prices___*');
+            };
 
-           foreach ($files as $key => $file) {
-               $filename =  $main_directory . $dir . "/" . $file;
-               // echo $file . PHP_EOL;
+            foreach ($files as $key => $file) {
+                $filename =  $main_directory . $dir . "/" . $file;
+                // echo $file . PHP_EOL;
 
-               $doc = \DOMDocument::load($filename);
-               $xpath = new \DOMXPath($doc);
+                $doc = \DOMDocument::load($filename);
+                $xpath = new \DOMXPath($doc);
 
-               // Register prefix
-               $prefix = "ptplad";
-               $rootNamespace = $doc->lookupNamespaceUri($doc->namespaceURI);
-               if (!($xpath->registerNamespace($prefix, $rootNamespace))) {
-                   echo "Cannot register namespace {$uri}.";
-               };
+                // Register prefix
+                $prefix = "ptplad";
+                $rootNamespace = $doc->lookupNamespaceUri($doc->namespaceURI);
+                if (!($xpath->registerNamespace($prefix, $rootNamespace))) {
+                    echo "Cannot register namespace {$uri}.";
+                };
 
-               $products = $xpath->query($xquery);
-               // echo "File: $file . Products: $products->length" . PHP_EOL;
-               if ($products->length > 0) {
-                   foreach ($products as $product) {
-                       $product_id = $product->getElementsByTagName('Ид')[0]->textContent;
-                       $prices = $product->getElementsByTagName('Цена');
+                $products = $xpath->query($xquery);
+                // echo "File: $file . Products: $products->length" . PHP_EOL;
+                if ($products->length > 0) {
+                    foreach ($products as $product) {
+                        $product_id = $product->getElementsByTagName('Ид')[0]->textContent;
+                        $prices = $product->getElementsByTagName('Цена');
 
-                       if ($prices->length > 0) {
-                           foreach ($prices as $price) {
-                               $price_type_id = $price->getElementsByTagName('ИдТипаЦены')[0]->textContent;
-                               $price_for_product = $price->getElementsByTagName('ЦенаЗаЕдиницу')[0]->nodeValue;
-                               $currency = $price->getElementsByTagName('Валюта')[0]->textContent;
+                        if ($prices->length > 0) {
+                            foreach ($prices as $price) {
+                                $price_type_id = $price->getElementsByTagName('ИдТипаЦены')[0]->textContent;
+                                $price_for_product = $price->getElementsByTagName('ЦенаЗаЕдиницу')[0]->nodeValue;
+                                $currency = $price->getElementsByTagName('Валюта')[0]->textContent;
 
-                               $stmt->execute(array(
+                                $stmt->execute(array(
                                    ":product_id"        => $product_id,
                                    ":price_type_id"     => $price_type_id,
                                    ":price_for_product" => $price_for_product
                                ));
-                               $price_count++;
-                           }
-                       }
-                       $product_count++;
-                   }
-               }
-           }
-       }
-       $end = microtime(true);
-       $parse_time = $end-$start;
-       if ($log) {
-           echo "Обработано $price_count записей с ценами для $product_count товаров за $parse_time." . PHP_EOL;
-       }
-       return true;
+                                $price_count++;
+                            }
+                        }
+                        $product_count++;
+                    }
+                }
+            }
+        }
+        $end = microtime(true);
+        $parse_time = $end-$start;
+        if ($log) {
+            echo "Обработано $price_count записей с ценами для $product_count товаров за $parse_time." . PHP_EOL;
+        }
+        return true;
     }
 
     /**
@@ -853,48 +853,48 @@ class DumpImporter
         }
 
         // Loop throughout directories
-       foreach ($dirs as $key => $dir) {
-           chdir($main_directory . $dir);
-           // Array of files with products
-           if ($dh = opendir($main_directory . $dir)) {
-               $files = glob('import___*');
-           };
+        foreach ($dirs as $key => $dir) {
+            chdir($main_directory . $dir);
+            // Array of files with products
+            if ($dh = opendir($main_directory . $dir)) {
+                $files = glob('import___*');
+            };
 
-           foreach ($files as $key => $file) {
-               $filename =  $main_directory . $dir . "/" . $file;
-               if ($log) {
-                   echo "---=== Обрабатывается файл '$filename' ===---" . PHP_EOL;
-               }
+            foreach ($files as $key => $file) {
+                $filename =  $main_directory . $dir . "/" . $file;
+                if ($log) {
+                    echo "---=== Обрабатывается файл '$filename' ===---" . PHP_EOL;
+                }
 
-               // Load XML from a file
-               $doc = \DOMDocument::load($filename);
-               // Create DOMXPath object
-               $xpath = new \DOMXPath($doc);
+                // Load XML from a file
+                $doc = \DOMDocument::load($filename);
+                // Create DOMXPath object
+                $xpath = new \DOMXPath($doc);
 
-               // Register prefix
-               $prefix = "ptplad";
-               $rootNamespace = $doc->lookupNamespaceUri($doc->namespaceURI);
-               if (!($xpath->registerNamespace($prefix, $rootNamespace))) {
-                   echo "Cannot register namespace {$uri}.";
-               };
+                // Register prefix
+                $prefix = "ptplad";
+                $rootNamespace = $doc->lookupNamespaceUri($doc->namespaceURI);
+                if (!($xpath->registerNamespace($prefix, $rootNamespace))) {
+                    echo "Cannot register namespace {$uri}.";
+                };
 
-               // XPath  query
-               $xquery  = "/{$prefix}:КоммерческаяИнформация";
-               $xquery .= "/{$prefix}:Каталог";
-               $xquery .= "/{$prefix}:Товары";
-               $xquery .= "/{$prefix}:Товар";
+                // XPath  query
+                $xquery  = "/{$prefix}:КоммерческаяИнформация";
+                $xquery .= "/{$prefix}:Каталог";
+                $xquery .= "/{$prefix}:Товары";
+                $xquery .= "/{$prefix}:Товар";
 
-               $products = $xpath->query($xquery);
-               if ($products->length > 0) {
-                   foreach ($products as $product) {
-                       $product_id = $product->getElementsByTagName('Ид')[0]->textContent;
-                       $product_article = $product->getElementsByTagName('Артикул')[0]->textContent;
-                       $product_name = $product->getElementsByTagName('Наименование')[0]->textContent;
-                       $product_measure_id = $product->getElementsByTagName('БазоваяЕдиница')[0]->textContent;
-                       $product_description = $product->getElementsByTagName('Описание')[0]->textContent;
+                $products = $xpath->query($xquery);
+                if ($products->length > 0) {
+                    foreach ($products as $product) {
+                        $product_id = $product->getElementsByTagName('Ид')[0]->textContent;
+                        $product_article = $product->getElementsByTagName('Артикул')[0]->textContent;
+                        $product_name = $product->getElementsByTagName('Наименование')[0]->textContent;
+                        $product_measure_id = $product->getElementsByTagName('БазоваяЕдиница')[0]->textContent;
+                        $product_description = $product->getElementsByTagName('Описание')[0]->textContent;
 
-                       // Insert product
-                       $product_stmt->execute(array(
+                        // Insert product
+                        $product_stmt->execute(array(
                            ":product_id"            => $product_id,
                            ":product_article"       => $product_article,
                            ":product_name"          => $product_name,
@@ -902,65 +902,94 @@ class DumpImporter
                            ":product_description"   => $product_description
                        ));
 
-                       // Insert images
-                       $pictures = $product->getElementsByTagName('Картинка');
-                       if ($pictures->length > 0) {
-                           foreach ($pictures as $picture) {
-                               $picture_path = $main_directory .
+                        // Insert images
+                        $pictures = $product->getElementsByTagName('Картинка');
+                        if ($pictures->length > 0) {
+                            foreach ($pictures as $picture) {
+                                $picture_path = $main_directory .
                                                $dir .
                                                "/" .
                                                $picture->textContent;
-                               if (file_exists($picture_path)) {
-                                   $pictures_stmt->execute(array(
+                                if (file_exists($picture_path)) {
+                                    $pictures_stmt->execute(array(
                                        ":product_id"    => $product_id,
                                        ":path"          => $picture_path
                                    ));
-                               }
-                           }
-                       }
+                                }
+                            }
+                        }
 
-                       // Insert product categories
-                       $categories = $product->getElementsByTagName('Группы');
-                       if ($categories->length > 0) {
-                           foreach ($categories as $category) {
-                               $category_id = $category->getElementsByTagName('Ид')[0]->textContent;
-                               $categories_stmt->execute(array(
+                        // Insert product categories
+                        $categories = $product->getElementsByTagName('Группы');
+                        if ($categories->length > 0) {
+                            foreach ($categories as $category) {
+                                $category_id = $category->getElementsByTagName('Ид')[0]->textContent;
+                                $categories_stmt->execute(array(
                                    ":product_id"    => $product_id,
                                    ":category_id"   => $category_id
                                ));
-                           }
-                       }
+                            }
+                        }
 
-                       // Insert product characteristics
-                       $properties = $product->getElementsByTagName('ЗначенияСвойства');
-                       if ($properties->length > 0) {
-                           foreach ($properties as $property) {
-                               if ($property->getElementsByTagName('Значение')[0]->textContent) {
-                                   $property_id = $property->getElementsByTagName('Ид')[0]->textContent;
-                                   $property_value_id = $property->getElementsByTagName('Значение')[0]->textContent;
+                        // Insert product characteristics
+                        $properties = $product->getElementsByTagName('ЗначенияСвойства');
+                        if ($properties->length > 0) {
+                            foreach ($properties as $property) {
+                                if ($property->getElementsByTagName('Значение')[0]->textContent) {
+                                    $property_id = $property->getElementsByTagName('Ид')[0]->textContent;
+                                    $property_value_id = $property->getElementsByTagName('Значение')[0]->textContent;
 
-                                   $properties_stmt->execute(array(
+                                    $properties_stmt->execute(array(
                                        ":product_id"        =>  $product_id,
                                        ":property_id"       => $property_id,
                                        ":property_value_id" => $property_value_id
                                    ));
-                               }
-                           }
-                       }
-                       $product_count++;
-                   }
-               }
-               if ($log) {
-                   echo "\tОбработано " . $products->length  . " товаров " .  PHP_EOL;
-               }
+                                }
+                            }
+                        }
+                        $product_count++;
+                    }
+                }
+                if ($log) {
+                    echo "\tОбработано " . $products->length  . " товаров " .  PHP_EOL;
+                }
+            }
+        }
+        $end = microtime(true);
+        $parse_time = $end-$start;
+        if ($log) {
+            echo "Обработано $product_count товаров за $parse_time" . PHP_EOL;
+        }
+        return true;
+    }
 
-           }
-       }
-       $end = microtime(true);
-       $parse_time = $end-$start;
-       if ($log) {
-           echo "Обработано $product_count товаров за $parse_time" . PHP_EOL;
-       }
-       return true;
+    /**
+     * Imports data
+     * @param  string  $source  Path to archive
+     * @param  string  $dest    Path to the folder for extraction
+     * @param  boolean $log     Output work result
+     */
+    public static function import(string $source, string $dest, $log = false)
+    {
+        // Extract archive
+        self::extractArchive($source, $dest, $log);
+
+        // Import categories
+        self::importCategories($log);
+
+        // Import price type
+        self::importPriceType($log);
+
+        // Import Measure Type
+        self::importMeasureType($log);
+
+        //  Import Properties
+        self::importProperties($log);
+
+        // Import Offers
+        self::importOffers($log);
+
+        // Import Products
+        self::importProducts($log);
     }
 }
