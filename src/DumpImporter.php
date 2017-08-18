@@ -2,6 +2,8 @@
 
 namespace Garkavenkov\PTPLad;
 
+use Garkavenkov\DBConnector\DBConnect;
+
 class DumpImporter
 {
     /**
@@ -11,6 +13,12 @@ class DumpImporter
     private static $dump_dest;
 
     /**
+     * Database handler
+     * @var DBConnector
+     */
+    private static $dbh;
+
+    /**
      * Extracts archive from '$source' file  into '$dest' folder
      *
      * @param  string  $source Path to archive file
@@ -18,7 +26,7 @@ class DumpImporter
      * @param  boolean $log    Output work results
      * @return boolean         Work result
      */
-    public static function extractArchive(string $source, string $dest, $log=false)
+    private static function extractArchive(string $source, string $dest, $log=false)
     {
         // Chech whether 'zip' module is loaded or not
         if (!extension_loaded('zip')) {
@@ -62,7 +70,7 @@ class DumpImporter
      * @param  boolean $log Output information
      * @return boolean      Work result
      */
-    public static function importCategories($log = false)
+    private static function importCategories($log = false)
     {
         // Destination folder not found
         if (!self::$dest) {
@@ -71,7 +79,7 @@ class DumpImporter
         }
 
         // Make path to the file
-        $dir = rtrim($this->dest, '/') .'/webdata/000000001/import___*';
+        $dir = rtrim(self::dest, '/') .'/webdata/000000001/import___*';
         // Grab first file from an array
         $file = glob($dir)[0];
         if (!$file) {
@@ -199,7 +207,7 @@ class DumpImporter
      * @param  boolean $log Output information
      * @return boolean      Work result
      */
-    public static function importPriceType($log = false)
+    private static function importPriceType($log = false)
     {
         // Destination folder not found
         if (!self::$dest) {
@@ -290,7 +298,7 @@ class DumpImporter
      * @param  boolean $log Output information
      * @return boolean      Work result
      */
-    public static function importMeasureType($log = false)
+    private static function importMeasureType($log = false)
     {
         // Destination folder not found
         if (!self::$dest) {
@@ -386,7 +394,7 @@ class DumpImporter
      * @param  boolean $log Output information
      * @return boolean      Work result
      */
-    public static function importProperties($log = false)
+    private static function importProperties($log = false)
     {
         // Parent folder with properties' file
         $main_directory = rtrim(self::$dest, '/') . "/webdata/000000001/properties/";
@@ -521,7 +529,7 @@ class DumpImporter
      * @param  boolean $log Output information
      * @return boolean      Work result
      */
-    public static function importOffers($log = false)
+    private static function importOffers($log = false)
     {
         $start = microtime(true);
         // Parent folder with offers' file
@@ -615,7 +623,7 @@ class DumpImporter
      * @param  boolean $log  Output work result
      * @return boolean       True if records have been inserted, false otherwise
      */
-    public static function importPrices($log = false)
+    private static function importPrices($log = false)
     {
         $start = microtime(true);
         // Parent folder with prices' file
@@ -722,7 +730,7 @@ class DumpImporter
      * @param  boolean $log  Output work result
      * @return boolean       True if records have been inserted, false otherwise
     */
-    public static function importProducts($log = false)
+    private static function importProducts($log = false)
     {
         $start = microtime(true);
 
@@ -969,8 +977,11 @@ class DumpImporter
      * @param  string  $dest    Path to the folder for extraction
      * @param  boolean $log     Output work result
      */
-    public static function import(string $source, string $dest, $log = false)
+    public static function import(DBConector $dbh, string $source, string $dest, $log = false)
     {
+        // Database handler
+        self::$dbh = $dbh
+
         // Extract archive
         self::extractArchive($source, $dest, $log);
 
