@@ -73,13 +73,13 @@ class DumpImporter
     private static function importCategories($log = false)
     {
         // Destination folder not found
-        if (!self::$dest) {
+        if (!self::$dump_dest) {
             echo "Cannot find folder with exracted files." . PHP_EOL;
             exit;
         }
 
         // Make path to the file
-        $dir = rtrim(self::dest, '/') .'/webdata/000000001/import___*';
+        $dir = rtrim(self::$dump_dest, '/') .'/webdata/000000001/import___*';
         // Grab first file from an array
         $file = glob($dir)[0];
         if (!$file) {
@@ -977,10 +977,10 @@ class DumpImporter
      * @param  string  $dest    Path to the folder for extraction
      * @param  boolean $log     Output work result
      */
-    public static function import(DBConector $dbh, string $source, string $dest, $log = false)
+    public static function import(DBConnect $dbh, string $source, string $dest, $log = false)
     {
         // Database handler
-        self::$dbh = $dbh
+        self::$dbh = $dbh;
 
         // Extract archive
         self::extractArchive($source, $dest, $log);

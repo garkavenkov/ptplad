@@ -4,6 +4,7 @@
     "keywords": ["PTPLad"],
     "type": "library",
     "require": {
+        "garkavenkov/db-connector": "^1.0"
     },
     "license": "MIT",
     "authors": [
