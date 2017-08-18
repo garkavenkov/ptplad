@@ -210,13 +210,13 @@ class DumpImporter
     private static function importPriceType($log = false)
     {
         // Destination folder not found
-        if (!self::$dest) {
+        if (!self::$dump_dest) {
             echo "Cannot find folder with exracted files." . PHP_EOL;
             exit;
         }
 
         // Make path to the file
-        $dir = rtrim(self::$dest, '/') .'/webdata/000000001/import___*';
+        $dir = rtrim(self::$dump_dest, '/') .'/webdata/000000001/import___*';
         // Grab first file from an array
         $file = glob($dir)[0];
         if (!$file) {
@@ -301,13 +301,13 @@ class DumpImporter
     private static function importMeasureType($log = false)
     {
         // Destination folder not found
-        if (!self::$dest) {
+        if (!self::$dump_dest) {
             echo "Cannot find folder with exracted files." . PHP_EOL;
             exit;
         }
 
         // Makes path to the file
-        $dir = rtrim(self::$dest, '/') .'/webdata/000000001/import___*';
+        $dir = rtrim(self::$dump_dest, '/') .'/webdata/000000001/import___*';
         // Grab first file from an array
         $file = glob($dir)[0];
         if (!$file) {
@@ -397,7 +397,7 @@ class DumpImporter
     private static function importProperties($log = false)
     {
         // Parent folder with properties' file
-        $main_directory = rtrim(self::$dest, '/') . "/webdata/000000001/properties/";
+        $main_directory = rtrim(self::$dump_dest, '/') . "/webdata/000000001/properties/";
 
         // Folders that contain files with properties
         $dirs  = array_diff(scandir($main_directory), array('..', '.'));
@@ -533,7 +533,7 @@ class DumpImporter
     {
         $start = microtime(true);
         // Parent folder with offers' file
-        $main_directory = rtrim(self::$dest, '/') . "/webdata/000000001/goods/";
+        $main_directory = rtrim(self::$dump_dest, '/') . "/webdata/000000001/goods/";
 
         // Folders that contain files with offers
         $dirs  = array_diff(scandir($main_directory), array('..', '.'));
@@ -627,7 +627,7 @@ class DumpImporter
     {
         $start = microtime(true);
         // Parent folder with prices' file
-        $main_directory = rtrim(self::$dest, '/') . "/webdata/000000001/goods/";
+        $main_directory = rtrim(self::$dump_dest, '/') . "/webdata/000000001/goods/";
         // Folders that contain files with prices
         $dirs  = array_diff(scandir($main_directory), array('..', '.'));
         asort($dirs);
@@ -736,7 +736,7 @@ class DumpImporter
 
         echo "----==== Запущен процесс обработки фалов с товарами ====----" . PHP_EOL;
         // Parent folder with Products' file
-        $main_directory = rtrim(self::$dest, '/') . "/webdata/000000001/goods/";
+        $main_directory = rtrim(self::$dump_dest, '/') . "/webdata/000000001/goods/";
         // Folders that contain files with products
         $dirs  = array_diff(scandir($main_directory), array('..', '.'));
         asort($dirs);
